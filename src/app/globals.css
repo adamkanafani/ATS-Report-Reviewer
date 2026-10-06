@@ -1,0 +1,899 @@
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+html {
+  height: 100%;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  color: var(--foreground);
+  /* ATS brand: solid black, with a dot-grid texture (see body::before) standing in for the
+     old hard diagonal split -- visible mainly through the frosted-glass header/footer and
+     around the file-picker screens, since the review screen's own panels stay opaque white
+     for readability. */
+  background: #0d0d0d;
+  background-attachment: fixed;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  position: relative;
+}
+
+/* Dot-grid texture: a red-to-dark-red-to-black gradient, running top to bottom, masked into a
+   repeating dot pattern, so each dot's color is really just "whatever the gradient is at that
+   point on the page" rather than a gradient baked into one dot. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: linear-gradient(to bottom, #e0464d 0%, #7a1a20 50%, #000000 100%);
+  -webkit-mask-image: radial-gradient(circle, #000 22%, transparent 23%);
+  mask-image: radial-gradient(circle, #000 22%, transparent 23%);
+  -webkit-mask-size: 10px 10px;
+  mask-size: 10px 10px;
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ATS wordmark, fixed to the bottom-right of the viewport on every screen. */
+body::after {
+  content: "";
+  position: fixed;
+  right: 24px;
+  bottom: 0;
+  width: min(56vw, 510px);
+  height: 226px;
+  background: url("/ats-logo.svg") bottom right / contain no-repeat;
+  opacity: 0.95;
+  pointer-events: none;
+  z-index: 0;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* --- ATS Report Reviewer --- */
+/* Shell and palette shared with ATS-Borescope-Report-App (itself ported from Tech-Rep-Report-App) so all three apps read as the same product
+   family, even though this app's flow (pick 2 files -> review -> generate) is simpler than the
+   INA app's job-folder scan/draft/edit flow. Palette re-themed to ATS's brand red/black instead
+   of the INA app's navy, sampled directly from the ATS logo (public/ats-logo.png). */
+
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 40px;
+  text-align: center;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.placeholder h1 {
+  font-size: 24px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.placeholder p {
+  color: #ffffff;
+  max-width: 44ch;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+
+.app-header {
+  padding: 12px 18px;
+  border-bottom: 1px solid #a4232b;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 4px 14px rgba(164, 35, 43, 0.12);
+}
+
+footer.app-header {
+  position: relative;
+  background: #0d0d0d;
+  border-bottom: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.app-header .job-path {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+  color: #f3d4d6;
+  flex: 1;
+  min-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Top header bar: solid black instead of the frosted-glass look, with the same dot-grid
+   texture as the file-picker screens painted on its own (see the shared ::before rule below)
+   -- not body::before/::after showing through, which would also expose the fixed logo
+   wordmark bleeding into the bar. */
+header.app-header {
+  background: #0d0d0d;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Self-contained dot-grid texture for the header/footer bars -- same recipe as body::before,
+   but scoped to each bar's own box so only the dots show, never the logo wordmark. */
+header.app-header::before,
+footer.app-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(to bottom, #e0464d 0%, #7a1a20 50%, #000000 100%);
+  -webkit-mask-image: radial-gradient(circle, #000 22%, transparent 23%);
+  mask-image: radial-gradient(circle, #000 22%, transparent 23%);
+  -webkit-mask-size: 10px 10px;
+  mask-size: 10px 10px;
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* The dot texture above is an absolutely-positioned pseudo-element, which paints after
+   ordinary in-flow children regardless of DOM order -- without this, it sits on top of the
+   header/footer's own text and buttons instead of behind them. */
+header.app-header > *,
+footer.app-header > * {
+  position: relative;
+  z-index: 1;
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #a4232b;
+}
+
+.sidebar-scroll {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  scrollbar-width: none;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.section-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 13px 16px 13px 13px;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+  border-right: 1px solid rgba(255, 255, 255, 0.25);
+  border-left: 3px solid transparent;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background-color 0.15s ease, border-left-color 0.15s ease;
+}
+
+.section-item:hover {
+  background: #7a1a20;
+  border-left-color: #ffffff;
+}
+
+.section-item:hover:not(.active) .title-row span:first-child,
+.section-item:hover:not(.active) .confidence-tag {
+  color: #ffffff;
+}
+
+.section-item.active {
+  background: #ffffff;
+  color: #a4232b;
+  font-weight: 600;
+  border-right: none;
+}
+
+.section-item.active .confidence-tag {
+  color: #6b4548;
+  background: #fbeaea;
+}
+
+.section-item .title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-item .title-row span:first-child {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.status-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.status-badge.ready {
+  background: #dff5e1;
+  color: #1a7431;
+}
+
+.status-badge.needs-attention {
+  background: #fff3cd;
+  color: #8a6300;
+}
+
+.status-badge.missing {
+  background: #fbe0e0;
+  color: #a4141a;
+}
+
+.confidence-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 1px 8px;
+  margin-top: 5px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.section-item:hover:not(.active) .confidence-tag {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.main-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 28px;
+  background: #ffffff;
+}
+
+.section-reason {
+  font-size: 13px;
+  color: #6b4548;
+  background: #fbeaea;
+  border: 1px solid #e3cfd0;
+  border-left: 3px solid #a4232b;
+  padding: 8px 14px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+select {
+  border: 1px solid #e3cfd0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  color: #1a1a1a;
+  background: #fbfdff;
+}
+
+button {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 9px 16px;
+  border-radius: 7px;
+  border: 1px solid #a4232b;
+  background: #a4232b;
+  color: white;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: 0 1px 3px rgba(164, 35, 43, 0.25);
+  transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+button:hover:not(:disabled):not(.section-item) {
+  background: #7a1a20;
+  box-shadow: 0 2px 6px rgba(164, 35, 43, 0.35);
+}
+
+button:active:not(:disabled):not(.section-item) {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px rgba(164, 35, 43, 0.3);
+}
+
+button:focus-visible {
+  outline: 2px solid #d4636b;
+  outline-offset: 2px;
+}
+
+button.secondary {
+  background: white;
+  color: #a4232b;
+  box-shadow: none;
+}
+
+button.secondary:hover:not(:disabled) {
+  background: #f7e4e5;
+}
+
+button.secondary:active:not(:disabled) {
+  background: #f0d2d4;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+button.generate-report {
+  background-color: #2e9d4f;
+  background-image: none;
+  border-color: #2e9d4f;
+  color: #ffffff;
+  font-size: 18px;
+  padding: 12px 24px;
+  margin-left: auto;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+}
+
+button.generate-report:hover:not(:disabled) {
+  background-color: #1a7431;
+  background-image: none;
+  border-color: #1a7431;
+  color: #ffffff;
+  box-shadow: 0 3px 8px rgba(26, 116, 49, 0.45);
+}
+
+button.generate-report:active:not(:disabled) {
+  background-color: #145c27;
+  background-image: none;
+  border-color: #145c27;
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(26, 116, 49, 0.4);
+}
+
+.unit-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.unit-row {
+  border: 1px solid #e3cfd0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(164, 35, 43, 0.06);
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.unit-row-thumb {
+  flex: 0 0 220px;
+  width: 220px;
+  height: 220px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #e3cfd0;
+  background: #f4e9ea;
+}
+
+.unit-row-thumb-missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #6b4548;
+  text-align: center;
+}
+
+.unit-row-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.unit-row-main {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.unit-row-measurements {
+  font-size: 12px;
+  color: #8a6300;
+  margin-bottom: 4px;
+}
+
+.unit-row-observation {
+  font-size: 13px;
+  color: #1a1a1a;
+}
+
+.unit-row-comments {
+  font-size: 12px;
+  color: #6b4548;
+  margin-top: 4px;
+}
+
+.unit-row select {
+  margin-top: 8px;
+  display: block;
+}
+
+/* Small round "x" on every normal unit row -- sends the photo to the Trash tab instead of
+   deleting it outright, so an accidental click is always recoverable. */
+.unit-row-delete {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid #a4232b;
+  background: #ffffff;
+  color: #a4232b;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+}
+
+.unit-row-delete:hover:not(:disabled) {
+  background: #a4232b;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+/* Trash tab rows: no reassignment dropdown (it's not in the report either way), just a way
+   back out. */
+.unit-row-recover {
+  margin-top: 8px;
+}
+
+.folder-picker {
+  padding: 40px;
+  max-width: 720px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+.app-logo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.app-logo h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: #e0464d;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.folder-picker-subtitle {
+  margin: 0 0 20px;
+  color: #d9d9d9;
+  font-size: 14px;
+}
+
+/* Black glass: a dark, translucent, frosted panel instead of the old light card, so the
+   dot-grid texture behind it reads through subtly rather than being covered by a white slab. */
+.folder-picker-card {
+  background: #0d0d0d;
+  border: 1px solid rgba(224, 70, 77, 0.25);
+  border-radius: 14px;
+  padding: 24px;
+  /* A soft red glow around the card, echoing the dot-grid gradient behind it, layered under the
+     original black drop shadow that gives it depth against the page. */
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45), 0 0 45px rgba(122, 26, 32, 0.3);
+}
+
+.folder-picker-error {
+  margin: 0 0 12px;
+  color: #ff6b72;
+  font-size: 13px;
+}
+
+.folder-picker-card .job-path {
+  display: inline-block;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+  color: #ff8a90;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  padding: 6px 14px;
+  margin: 0 0 4px;
+}
+
+.folder-list {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  max-height: 460px;
+  overflow-y: auto;
+  margin-top: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(164, 35, 43, 0.25);
+}
+
+.folder-list button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: #f0f0f0;
+  font-weight: 700;
+  font-size: 15px;
+  border: none;
+  padding: 14px 18px;
+  margin-bottom: 3px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/* A faint zebra tint so rows read as distinct entries in a long list, rather than one flat
+   black slab -- subtle enough to disappear once a row's own hover/active state takes over. */
+.folder-list button:nth-child(even) {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.folder-list button:last-child {
+  margin-bottom: 0;
+  box-shadow: none;
+}
+
+.folder-list button:hover:not(:disabled) {
+  background: #7a1a20;
+  color: #ffffff;
+}
+
+.folder-list-loading,
+.folder-list-empty {
+  margin-top: 4px;
+  padding: 28px 18px;
+  text-align: center;
+  color: #a8a8a8;
+  font-size: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+/* Divides the curated template list from the tech rep's own uploaded ones underneath it. */
+.folder-list-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #a8a8a8;
+  padding: 10px 18px 4px;
+}
+
+@keyframes folder-list-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.folder-list-enter {
+  animation: folder-list-fade-in 0.2s ease;
+}
+
+/* Section-selection confirmation modal, shown before generating -- lets a customer's paid-for
+   scope exclude whole sections from the report (see sectionExclusion.ts). */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.modal-card {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 24px;
+  width: min(420px, 90vw);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+}
+
+.modal-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #a4232b;
+}
+
+.modal-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 14px 0;
+}
+
+.modal-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.modal-checkbox-row:hover {
+  background: #fbeaea;
+}
+
+/* Same checklist markup, reused on the dark "Ready to generate" card (see ReadyToGenerateScreen)
+   -- its default text color and light hover fill are tuned for the white .modal-card popup and
+   are nearly invisible against .folder-picker-card's near-black background. */
+.folder-picker-card .modal-checkbox-row {
+  color: #ffffff;
+}
+
+.folder-picker-card .modal-checkbox-row:hover {
+  background: rgba(164, 35, 43, 0.35);
+}
+
+.modal-checkbox-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: #a4232b;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* --- Reviewer-specific screens --- */
+
+.folder-picker-card {
+  position: relative;
+}
+
+.folder-picker-card.dragging {
+  border-color: #e0464d;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45), 0 0 60px rgba(224, 70, 77, 0.45);
+}
+
+.drop-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: rgba(13, 13, 13, 0.85);
+  border: 2px dashed #e0464d;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.folder-picker-warning {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(255, 196, 0, 0.12);
+  border: 1px solid rgba(255, 196, 0, 0.35);
+  color: #ffd76a;
+  font-size: 13px;
+}
+
+.red-sample {
+  color: #ff4d4d;
+  font-weight: 700;
+}
+
+.ai-tag {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #ffffff;
+  background: rgba(224, 70, 77, 0.35);
+  border: 1px solid rgba(224, 70, 77, 0.6);
+}
+
+.progress-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 0 4px;
+  font-size: 14px;
+}
+
+.progress-list li {
+  color: #a8a8a8;
+  padding-left: 22px;
+  position: relative;
+}
+
+.progress-list li::before {
+  content: "✓";
+  position: absolute;
+  left: 2px;
+  color: #2e9d4f;
+  font-weight: 700;
+}
+
+.progress-list li.current {
+  color: #ffffff;
+}
+
+.progress-list li.current::before {
+  content: "";
+  top: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 2px solid #e0464d;
+  border-top-color: transparent;
+  animation: reviewer-spin 0.8s linear infinite;
+}
+
+@keyframes reviewer-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.footer-stats {
+  color: #f3d4d6;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.empty-note {
+  color: #6b4548;
+  font-size: 14px;
+}
+
+.change-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.change-card {
+  border: 1px solid #e3cfd0;
+  border-left: 3px solid #e3cfd0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(164, 35, 43, 0.06);
+}
+
+.change-card.attention {
+  border-left-color: #d9a400;
+}
+
+.change-location {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b4548;
+  margin-bottom: 4px;
+}
+
+.change-note {
+  font-size: 14px;
+  color: #1a1a1a;
+}
+
+.change-quote,
+.change-diff {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #faf6f6;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 15px;
+  line-height: 1.45;
+  color: #1a1a1a;
+  white-space: pre-wrap;
+}
+
+.change-diff .del {
+  color: #8a7a7b;
+  text-decoration: line-through;
+}
+
+.change-diff .ins {
+  color: #ff0000;
+}
