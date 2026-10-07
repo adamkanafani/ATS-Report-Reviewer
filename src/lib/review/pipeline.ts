@@ -349,7 +349,7 @@ export async function runReview(input: Buffer, options: ReviewOptions, progress:
         };
         // Belt and braces: the prompt asks for plain-language references, but swap any id that
         // slips through for the row/photo it stands for.
-        const humanize = (msg: string) => msg.replace(/([OP]\d+)/g, (m: string) => anchors.get(m)?.name ?? m);
+        const humanize = (msg: string) => msg.replace(/\b[OP]\d+\b/g, (m: string) => anchors.get(m)?.name ?? m);
         for (const raw of crossResult.value) {
           const f = { ...raw, message: humanize(raw.message) };
           const anchor = anchors.get(f.anchorId);
