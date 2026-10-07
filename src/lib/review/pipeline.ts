@@ -123,6 +123,9 @@ interface Anchored {
   id: string;
   anchor: Element;
   line: string;
+  /** How the reviewer would refer to it in Word, e.g. the "R4" row or the "Stage 4 Rotor Blade,
+   *  Leading Edge Pressure Side (Impact damage)" photo -- the AI's internal ids mean nothing there. */
+  name: string;
 }
 
 function collectObservationRows(model: DocModel): Anchored[] {
@@ -136,7 +139,8 @@ function collectObservationRows(model: DocModel): Anchored[] {
     const anchorCell = childrenThroughWrappers(p.table.row, "w:tc")[cells.length > 1 ? 1 : 0];
     const anchor = descendants(anchorCell, "w:p").find((q) => textOf(q).trim()) ?? descendants(anchorCell, "w:p")[0] ?? p.el;
     const id = `O${rows.length + 1}`;
-    rows.push({ id, anchor, line: `${id} | ${p.h2 ?? p.h1 ?? ""} | ${cells.join(" | ")}` });
+    const rowName = cells[0] ? `the "${shorten(cells[0], 40)}" row` : "this row";
+    rows.push({ id, anchor, line: `${id} | ${p.h2 ?? p.h1 ?? ""} | ${cells.join(" | ")}`, name: rowName });
   }
   return rows;
 }
@@ -151,6 +155,7 @@ function collectPhotoEntries(model: DocModel): Anchored[] {
       const fields: string[] = [];
       let anchor: Element | null = null;
       let firstValue: Element | null = null;
+      const byLabel = new Map<string, string>();
       for (const row of childrenThroughWrappers(unit, "w:tr")) {
         const cells = childrenThroughWrappers(row, "w:tc");
         if (cells.length < 2) continue;
@@ -159,6 +164,7 @@ function collectPhotoEntries(model: DocModel): Anchored[] {
         const value = textOf(valueCell).trim();
         if (!label && !value) continue;
         fields.push(`${label}: ${value}`);
+        byLabel.set(label.toLowerCase(), value);
         const valuePara = descendants(valueCell, "w:p").find((q) => textOf(q).trim()) ?? null;
         if (!firstValue && valuePara) firstValue = valuePara;
         if (/^(observation|classification)$/i.test(label) && valuePara) anchor = valuePara;
@@ -172,7 +178,10 @@ function collectPhotoEntries(model: DocModel): Anchored[] {
       const anchorEl = anchor ?? firstValue ?? fallback;
       if (!anchorEl) continue;
       const id = `P${entries.length + 1}`;
-      entries.push({ id, anchor: anchorEl, line: `${id} | ${table.h2 ?? ""} | ${shorten(fields.join("; "), 400)}` });
+      const where = [byLabel.get("component"), byLabel.get("location")].filter(Boolean).join(", ");
+      const what = byLabel.get("observation") ?? byLabel.get("classification");
+      const photoName = where ? `the "${where}${what ? ` (${what})` : ""}" photo` : "a photo";
+      entries.push({ id, anchor: anchorEl, line: `${id} | ${table.h2 ?? ""} | ${shorten(fields.join("; "), 400)}`, name: photoName });
     }
   }
   return entries;
@@ -338,7 +347,11 @@ export async function runReview(input: Buffer, options: ReviewOptions, progress:
           condition_mismatch: "Condition mismatch",
           other: "Check",
         };
-        for (const f of crossResult.value) {
+        // Belt and braces: the prompt asks for plain-language references, but swap any id that
+        // slips through for the row/photo it stands for.
+        const humanize = (msg: string) => msg.replace(/([OP]\d+)/g, (m: string) => anchors.get(m)?.name ?? m);
+        for (const raw of crossResult.value) {
+          const f = { ...raw, message: humanize(raw.message) };
           const anchor = anchors.get(f.anchorId);
           const label = labels[f.type] ?? "Check";
           log.add("crossCheck", {

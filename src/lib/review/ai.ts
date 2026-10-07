@@ -237,7 +237,9 @@ Compare the two lists and report real discrepancies only:
 - condition_mismatch: the condition itself is described differently in a way that changes meaning.
 Match components sensibly: R1 / R-1 / "Stage 1 Rotor Blade" are the same; S1 / "Stage 1 Stator Vane" are the same; IGV / VIGV / "Variable Inlet Guide Vanes" are the same; combustion "Liner 3" / "Position 3" / "Combustion Liner 3" are the same. Treat wording differences that mean the same thing ("Impact damage at the leading edge" vs "Leading edge impact damage") as matches -- do not report them. Photos labeled Operational Data or Data Plate are not inspection findings; ignore them.
 
-Attach each finding to the most relevant id: the Observations-table row (O...) when a row is involved, otherwise the photo (P...). Return an empty list if everything lines up.`;
+Attach each finding to the most relevant id: the Observations-table row (O...) when a row is involved, otherwise the photo (P...). Return an empty list if everything lines up.
+
+The message is read by the report reviewer as a Word comment, where the O/P ids don't exist. Never write an id in the message -- refer to rows by their label ("the R4 row") and to photos by their caption ("the Stage 4 Rotor Blade, Leading Edge Pressure Side photo").`;
   const user = `OBSERVATIONS TABLES (one line per row: id | section | cells):\n${observationRows}\n\nPHOTO TABLES (one line per photo: id | section | caption fields):\n${photoEntries}`;
   const result = await callJson<{ findings: CrossCheckFinding[] }>(system, user, CROSSCHECK_SCHEMA, "high");
   return result.findings;
