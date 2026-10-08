@@ -85,9 +85,11 @@ export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, in
 const ATS_CONTEXT = `You are reviewing a borescope inspection report written by a field inspector for Advanced Turbine Support (ATS), which inspects gas and steam turbines (GE, Siemens, Mitsubishi, etc.). The report goes to ATS's report reviewer, then to the customer.`;
 
 const HOUSE_STYLE = `ATS house style (Report Composition standards):
-- Observations (Observations-table Condition cells, and photo-table Observation / Comments values) are brief statements, not full sentences. The first word is capitalized; everything else is lowercase except proper nouns and abbreviations (LE, TE, IGV, VIGV, EGV, R-1, S-17, TIL, CDC, GE, DLN). No random capitalization ("Leading edge Impact Damage" -> "Leading edge impact damage").
-- Multiple observations on one component are separated by commas, e.g. "Leading edge impact damage (1), Trailing edge impact damage (2), Rub marks at 6 o'clock".
-- Previously identified conditions read "Previously identified <condition>, appears unchanged" (or ", has increased by ...").
+- Photo-table caption values (Component, Location, Observation, Comments next to each photo) come straight from the borescope's menus: fix misspellings only and keep their capitalization and wording as written ("Impact Damage" stays as is). The observation rules below are for the Observations tables.
+- Observations (Observations-table Condition cells) are brief statements, not full sentences. The first word is capitalized; everything else is lowercase except proper nouns and abbreviations (LE, TE, IGV, VIGV, EGV, R-1, S-17, TIL, CDC, GE, DLN). No random capitalization ("Impact Damage At The Tip" -> "Impact damage at the tip").
+- Each observation names the condition first, then where it is: "Impact damage at the leading edge (1)", "Cracks and coating loss at the leading edge near 6 o'clock", "Rub marks at 6 o'clock". Reorder location-first wording to match ("Leading edge cracks" -> "Cracks at the leading edge"). The location may be shared across conditions ("Cracks at the trailing edge, at the seal slots and at the platforms").
+- Multiple observations on one component are separated by commas, e.g. "Impact damage at the leading edge (1), Impact damage at the trailing edge (2), Rub marks at 6 o'clock".
+- Previously identified conditions read "Previously identified <condition> appears unchanged" (or "... has increased by ..."), with no comma before "appears".
 - Spell out the word "Number"; never use "#".
 - Measurements use a leading zero before a decimal (0.023 inch, never .023 inch) and the correct singular/plural ("1 inch", "0.5 inch", "2 inches").
 - Dates never zero-pad the day: "May 7, 2017", not "May 07, 2017".
@@ -193,7 +195,7 @@ ${EDIT_RULES}`;
 
 export interface CrossCheckFinding {
   anchorId: string;
-  type: "missing_photo" | "missing_observation" | "count_mismatch" | "location_mismatch" | "condition_mismatch" | "other";
+  type: "missing_photo" | "missing_observation" | "count_mismatch" | "location_mismatch" | "condition_mismatch" | "missing_recommendation" | "other";
   message: string;
 }
 
@@ -207,11 +209,11 @@ const CROSSCHECK_SCHEMA = {
         properties: {
           anchorId: {
             type: "string",
-            description: "The id of the Observations-table row (O...) or photo (P...) this finding should be attached to.",
+            description: "The id of the Observations-table row (OBS-n), photo (PHOTO-n), or recommendation paragraph (REC-n) this finding should be attached to.",
           },
           type: {
             type: "string",
-            enum: ["missing_photo", "missing_observation", "count_mismatch", "location_mismatch", "condition_mismatch", "other"],
+            enum: ["missing_photo", "missing_observation", "count_mismatch", "location_mismatch", "condition_mismatch", "missing_recommendation", "other"],
           },
           message: { type: "string", description: "One or two sentences the reviewer can act on, naming the component and the photo(s)/row involved." },
         },
@@ -224,7 +226,7 @@ const CROSSCHECK_SCHEMA = {
   additionalProperties: false,
 };
 
-export async function crossCheckObservations(observationRows: string, photoEntries: string): Promise<CrossCheckFinding[]> {
+export async function crossCheckObservations(observationRows: string, photoEntries: string, recommendations: string): Promise<CrossCheckFinding[]> {
   const system = `${ATS_CONTEXT}
 
 Your job: confirm that the observations listed in the report's photo tables match the report's Observations tables. ATS rules: every observation listed in an Observations table needs a photo supporting it, and every non-typical condition shown in the photos should appear in the Observations table for that component.
@@ -235,12 +237,13 @@ Compare the two lists and report real discrepancies only:
 - count_mismatch: quantities disagree (e.g. table says impact damage (6) but photos show 4 blades).
 - location_mismatch: the component, stage, position, or location (LE/TE/tip/platform, o'clock) disagrees.
 - condition_mismatch: the condition itself is described differently in a way that changes meaning.
+- missing_recommendation: a serious condition in the Observations tables -- material loss, liberated or missing material, or damage the report itself calls significant, severe, or out of limits -- that has no matching paragraph in Significant Observations and Recommendations. Attach it to the Observations-table row. ATS normally reports cracks, coating loss, erosion, deposits, rub marks, and similar wear (turbine nozzle cracks included) in the tables without a separate recommendation, so don't flag those. Also flag a recommendation whose location or quantity doesn't match the Observations table (attach it to the recommendation, REC-n).
 Match components sensibly: R1 / R-1 / "Stage 1 Rotor Blade" are the same; S1 / "Stage 1 Stator Vane" are the same; IGV / VIGV / "Variable Inlet Guide Vanes" are the same; combustion "Liner 3" / "Position 3" / "Combustion Liner 3" are the same. Treat wording differences that mean the same thing ("Impact damage at the leading edge" vs "Leading edge impact damage") as matches -- do not report them. Photos labeled Operational Data or Data Plate are not inspection findings; ignore them.
 
-Attach each finding to the most relevant id: the Observations-table row (O...) when a row is involved, otherwise the photo (P...). Return an empty list if everything lines up.
+Attach each finding to the most relevant id: the Observations-table row (OBS-n) when a row is involved, otherwise the photo (PHOTO-n) or recommendation (REC-n). Return an empty list if everything lines up.
 
-The message is read by the report reviewer as a Word comment, where the O/P ids don't exist. Never write an id in the message -- refer to rows by their label ("the R4 row") and to photos by their caption ("the Stage 4 Rotor Blade, Leading Edge Pressure Side photo").`;
-  const user = `OBSERVATIONS TABLES (one line per row: id | section | cells):\n${observationRows}\n\nPHOTO TABLES (one line per photo: id | section | caption fields):\n${photoEntries}`;
+The message is read by the report reviewer as a Word comment, where these ids don't exist. Never write an id in the message -- refer to rows by their label ("the R4 row") and to photos by their caption ("the Stage 4 Rotor Blade, Leading Edge Pressure Side photo").`;
+  const user = `OBSERVATIONS TABLES (one line per row: id | section | cells):\n${observationRows}\n\nPHOTO TABLES (one line per photo: id | section | caption fields):\n${photoEntries}\n\nSIGNIFICANT OBSERVATIONS AND RECOMMENDATIONS (one line per paragraph: id | text):\n${recommendations || "(none in this report)"}`;
   const result = await callJson<{ findings: CrossCheckFinding[] }>(system, user, CROSSCHECK_SCHEMA, "high");
   return result.findings;
 }

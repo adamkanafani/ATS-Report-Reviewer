@@ -138,7 +138,8 @@ function collectObservationRows(model: DocModel): Anchored[] {
     if (!cells.some((c) => c)) continue;
     const anchorCell = childrenThroughWrappers(p.table.row, "w:tc")[cells.length > 1 ? 1 : 0];
     const anchor = descendants(anchorCell, "w:p").find((q) => textOf(q).trim()) ?? descendants(anchorCell, "w:p")[0] ?? p.el;
-    const id = `O${rows.length + 1}`;
+    // Ids that can't be mistaken for report text ("O3"/"P5" read like stage or position names).
+    const id = `OBS-${rows.length + 1}`;
     const rowName = cells[0] ? `the "${shorten(cells[0], 40)}" row` : "this row";
     rows.push({ id, anchor, line: `${id} | ${p.h2 ?? p.h1 ?? ""} | ${cells.join(" | ")}`, name: rowName });
   }
@@ -177,7 +178,7 @@ function collectPhotoEntries(model: DocModel): Anchored[] {
       const fallback = descendants(unit, "w:p").find((q) => textOf(q).trim()) ?? null;
       const anchorEl = anchor ?? firstValue ?? fallback;
       if (!anchorEl) continue;
-      const id = `P${entries.length + 1}`;
+      const id = `PHOTO-${entries.length + 1}`;
       const where = [byLabel.get("component"), byLabel.get("location")].filter(Boolean).join(", ");
       const what = byLabel.get("observation") ?? byLabel.get("classification");
       const photoName = where ? `the "${where}${what ? ` (${what})` : ""}" photo` : "a photo";
@@ -185,6 +186,17 @@ function collectPhotoEntries(model: DocModel): Anchored[] {
     }
   }
   return entries;
+}
+
+/** Significant Observations and Recommendations paragraphs, so the cross-check can flag a
+ *  significant finding with no recommendation (Brett's GT2B edits added one by hand). */
+function collectRecommendations(model: DocModel): Anchored[] {
+  return model.paragraphs
+    .filter((p) => p.h1 && normalizeHeading(p.h1) === "significant observations and recommendations" && !p.headingLevel && hasWords(p.text))
+    .map((p, i) => {
+      const id = `REC-${i + 1}`;
+      return { id, anchor: p.el, line: `${id} | ${shorten(p.text, 700)}`, name: `the recommendation beginning "${shorten(p.text, 50)}"` };
+    });
 }
 
 // --- Main ---
@@ -223,6 +235,7 @@ export async function runReview(input: Buffer, options: ReviewOptions, progress:
     const proofBatches = batchItems(proofGroups);
     const obsRows = options.crossCheck ? collectObservationRows(model) : [];
     const photoEntries = options.crossCheck ? collectPhotoEntries(model) : [];
+    const recParas = options.crossCheck ? collectRecommendations(model) : [];
     const doCross = options.crossCheck && obsRows.length > 0 && photoEntries.length > 0;
     if (options.crossCheck && !doCross) {
       log.skip(
@@ -272,9 +285,11 @@ export async function runReview(input: Buffer, options: ReviewOptions, progress:
       }),
       doOa ? reviewOverallAssessment(oaItems, supporting).finally(() => tick("Overall Assessment")) : Promise.resolve(null),
       doCross
-        ? crossCheckObservations(obsRows.map((r) => r.line).join("\n"), photoEntries.map((e) => e.line).join("\n")).finally(() =>
-            tick("photo vs. observation check"),
-          )
+        ? crossCheckObservations(
+            obsRows.map((r) => r.line).join("\n"),
+            photoEntries.map((e) => e.line).join("\n"),
+            recParas.map((r) => r.line).join("\n"),
+          ).finally(() => tick("photo vs. observation check"))
         : Promise.resolve(null),
       outline.length ? reviewHeadings(outline).finally(() => tick("heading styles")) : Promise.resolve(null),
     ]);
@@ -338,18 +353,19 @@ export async function runReview(input: Buffer, options: ReviewOptions, progress:
     // Cross-check findings -> comments.
     if (doCross) {
       if (crossResult.status === "fulfilled" && crossResult.value) {
-        const anchors = new Map<string, Anchored>([...obsRows, ...photoEntries].map((a) => [a.id, a]));
+        const anchors = new Map<string, Anchored>([...obsRows, ...photoEntries, ...recParas].map((a) => [a.id, a]));
         const labels: Record<string, string> = {
           missing_photo: "No supporting photo",
           missing_observation: "Missing from Observations table",
           count_mismatch: "Count mismatch",
           location_mismatch: "Location mismatch",
           condition_mismatch: "Condition mismatch",
+          missing_recommendation: "No recommendation",
           other: "Check",
         };
         // Belt and braces: the prompt asks for plain-language references, but swap any id that
-        // slips through for the row/photo it stands for.
-        const humanize = (msg: string) => msg.replace(/\b[OP]\d+\b/g, (m: string) => anchors.get(m)?.name ?? m);
+        // slips through for the row/photo/recommendation it stands for.
+        const humanize = (msg: string) => msg.replace(/\b(?:OBS|PHOTO|REC)-\d+\b/g, (m: string) => anchors.get(m)?.name ?? m);
         for (const raw of crossResult.value) {
           const f = { ...raw, message: humanize(raw.message) };
           const anchor = anchors.get(f.anchorId);

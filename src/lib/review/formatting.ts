@@ -275,7 +275,9 @@ function applyPhotoTables({ model, log }: FormattingContext) {
       if (!cx || !cy) continue;
       const aspect = cx / cy;
       if (aspect < 1.2 || aspect > 1.45) continue; // only standard landscape borescope shots
-      if (Math.abs(cy - PHOTO_HEIGHT_EMU) / PHOTO_HEIGHT_EMU <= 0.03) continue;
+      // Leave near-standard photos alone: inspectors' 4.32" x 3.31" pastes (GT2B) are within
+      // eyeball distance of 4.3" x 3.2", and shaving 0.1" off them is just noise in the output.
+      if (Math.abs(cy - PHOTO_HEIGHT_EMU) / PHOTO_HEIGHT_EMU <= 0.05) continue;
       const newCx = Math.round(PHOTO_HEIGHT_EMU * aspect);
       const tc = enclosing(inline, "w:tc");
       const tcW = tc ? firstChild(firstChild(tc, "w:tcPr") ?? tc, "w:tcW") : null;

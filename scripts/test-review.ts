@@ -73,8 +73,8 @@ function installMockAi() {
     recommendations: ["Mock recommendation: mention the R-1 mold replica follow-up in the Compressor assessment."],
   });
   mock.crossCheckObservations = async () => [
-    { anchorId: "O3", type: "count_mismatch", message: "Mock finding: table lists impact damage (6) but only 5 R1 photos show it." },
-    { anchorId: "P5", type: "missing_observation", message: "Mock finding: photo shows a condition not in the Observations table." },
+    { anchorId: "OBS-3", type: "count_mismatch", message: "Mock finding: table lists impact damage (6) but only 5 R1 photos show it." },
+    { anchorId: "PHOTO-5", type: "missing_observation", message: "Mock finding: photo shows a condition not in the Observations table." },
   ];
   mock.reviewHeadings = async () => [];
 }
@@ -96,6 +96,7 @@ async function main() {
   const started = Date.now();
   const result = await runReview(buffer, DEFAULT_OPTIONS, (msg) => console.log(`[${((Date.now() - started) / 1000).toFixed(1)}s] ${msg}`));
   await fs.writeFile(output, result.buffer);
+  await fs.writeFile(output.replace(/\.docx$/i, ".json"), JSON.stringify(result.categories, null, 2));
 
   for (const cat of result.categories) {
     console.log(`\n== ${cat.title} (${cat.items.length})${cat.skippedReason ? ` -- SKIPPED: ${cat.skippedReason}` : ""}`);
