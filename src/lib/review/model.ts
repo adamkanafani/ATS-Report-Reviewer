@@ -214,7 +214,9 @@ export function buildModel(documentXml: Document, stylesXml: Document | null): D
 
     let table: TableCtx | null = null;
     if (raw.table) {
-      const kind: TableKind = photoTopTables.has(raw.table.topTbl)
+      // The cover page is itself a table holding the ATS logo -- it must not be treated as a
+      // photo table, or its 40/22 pt title block gets flattened to the photo-caption 12 pt.
+      const kind: TableKind = photoTopTables.has(raw.table.topTbl) && zone !== "cover" && zone !== "toc"
         ? "photo"
         : h1 && normalizeHeading(h1) === "observations"
           ? "observation"

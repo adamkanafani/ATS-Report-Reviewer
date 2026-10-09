@@ -52,6 +52,9 @@ async function callJson<T>(system: string, user: string, schema: Record<string, 
     message = await finalMessage(system, user, schema, effort);
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) throw new Error("The Anthropic API key was rejected -- check ANTHROPIC_API_KEY in .env.local.");
+    if (err instanceof Anthropic.BadRequestError && /workspace/i.test(err.message)) {
+      throw new Error("This Anthropic API key isn't assigned to a workspace. Create a key scoped to a workspace (e.g. Default) and put it in .env.local.");
+    }
     if (err instanceof Anthropic.RateLimitError) throw new Error("The Anthropic API rate limit was hit -- wait a minute and run the review again.");
     if (err instanceof Anthropic.APIConnectionError) throw new Error("Couldn't reach the Anthropic API -- check this computer's internet connection.");
     throw err;
