@@ -171,7 +171,7 @@ function ReadyScreen({
         </div>
         <p className="job-path">{source.kind === "path" ? source.path : source.name}</p>
         <p className="folder-picker-subtitle" style={{ marginTop: 14 }}>
-          The reviewed copy comes back as a new Word file. Everything the AI changed is in <span className="red-sample">red</span>;
+          The reviewed copy downloads under the same file name, into your Downloads folder. Everything the AI changed is in <span className="red-sample">red</span>;
           everything else is black. Findings that need a decision (mismatched photos, Overall Assessment suggestions) are left as Word
           comments.
         </p>
@@ -282,6 +282,7 @@ function ResultsScreen({ source, result, onReviewAnother }: { source: ReportSour
     <div className="app-shell">
       <header className="app-header">
         <h1 style={{ fontSize: 16, fontWeight: 700, color: "#ffffff" }}>ATS Report Reviewer</h1>
+        <span className="app-version">v {process.env.NEXT_PUBLIC_APP_VERSION}</span>
         <span className="job-path">{source.kind === "path" ? source.path : source.name}</span>
         <button className="secondary" onClick={onReviewAnother}>
           Review Another Report
@@ -528,6 +529,7 @@ function FilePicker({
           <h1>{title}</h1>
         </div>
         <p className="folder-picker-subtitle">{instructions}</p>
+        <p className="app-version">Version {process.env.NEXT_PUBLIC_APP_VERSION}</p>
         {data && !data.isDriveList && data.dir && <p className="job-path">{data.dir}</p>}
         <div className="toolbar">
           <button className="secondary" disabled={historyIndex === 0} onClick={() => setHistoryIndex((i) => i - 1)} title="Previous folder" aria-label="Previous folder">

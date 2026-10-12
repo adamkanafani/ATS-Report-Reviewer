@@ -8,19 +8,21 @@ the report reviewer. Same shell and look as the ATS Borescope Report Builder.
 
 | Check | How |
 |---|---|
-| Formatting (Report Composition standards) | Times New Roman throughout, 12 pt body / 11 pt Observations tables, 7" tables, centered Percent Inspected cells, standard photo size |
+| Formatting (Report Composition standards) | Times New Roman throughout, 12 pt body paragraphs / 11 pt Observations tables (other tables keep their size), 7" tables, centered Percent Inspected cells, standard photo size |
 | Spell check and grammar | Claude AI, applied as word-level edits |
 | Photo tables vs. Observations tables | Claude AI; mismatches are left as Word comments |
 | Overall Assessment readability | Claude AI; edits applied, recommendations left as a Word comment |
 | Heading styles | Fixed rules for the standard section names, plus an AI pass for one-off section names |
 | Photo-table text | Times New Roman 12 |
+| Photo section layout | Narrow (0.5") margins on every photo page; restores a deleted section break before Photos (with the body's standard margins and page header); removes photo-table cells hidden in the margin |
+| Cover page | Title 44 pt, other lines 22 pt |
 | Table of Contents | Rebuilt by the installed Microsoft Word, set to TNR 12, 1.5 spacing, black |
 | Photo resolution | Every photo resampled to 150 ppi at its displayed size, operational data photo(s) excluded; the document's default resolution is also set to 150 ppi |
 | Text color | Everything black, **except AI edits, which are red** for review |
 
 It also lists template placeholders still in the report (X, XX, 20XX, "Choose an item.").
-It never fills those in. The original file is never modified. The reviewed copy downloads as
-`<name> - Reviewed.docx`, and the app shows a read-only log of every change.
+It never fills those in. The original file is never modified. The reviewed copy downloads
+under its original file name (to the browser's Downloads folder), and the app shows a read-only log of every change.
 
 ## Setup (each computer)
 

@@ -25,6 +25,7 @@ import {
   TBLPR_ORDER,
 } from "../docx/ooxml";
 import { DocModel, locationLabel, normalizeHeading, ParaInfo, PHOTO_CAPTION_LABELS, refreshHeadingContext } from "./model";
+import { applyPhotoSectionLayout, HeaderFooterRel } from "./layout";
 import type { ReviewLog } from "./report";
 import type { ReviewOptions } from "./types";
 
@@ -65,6 +66,9 @@ export interface FormattingContext {
   model: DocModel;
   log: ReviewLog;
   options: ReviewOptions;
+  /** Header/footer relationships from document.xml.rels, for reattaching ones a deleted
+   *  section break left orphaned. */
+  headerFooterRels?: HeaderFooterRel[];
 }
 
 export function applyFormatting(ctx: FormattingContext): { hasToc: boolean } {
@@ -72,11 +76,15 @@ export function applyFormatting(ctx: FormattingContext): { hasToc: boolean } {
   if (options.formatting) {
     applyColor(ctx);
     applyFonts(ctx);
+    applyCoverSizes(ctx);
     applyBodySizes(ctx);
     applyTableWidths(ctx);
     applyPercentCells(ctx);
   }
-  if (options.photoTables) applyPhotoTables(ctx);
+  if (options.photoTables) {
+    applyPhotoTables(ctx);
+    applyPhotoSectionLayout(ctx.documentXml, ctx.model, ctx.log, ctx.headerFooterRels ?? []);
+  }
   if (options.headings) applyKnownHeadings(ctx);
   scanPlaceholders(ctx);
   const hasToc = descendants(ctx.documentXml.documentElement, "w:instrText").some((t) => /\bTOC\b/.test(t.textContent ?? ""));
@@ -114,16 +122,45 @@ function applyFonts({ documentXml, stylesXml, log }: FormattingContext) {
       const rPr = firstChild(style, "w:rPr");
       if (rPr && forceTimesNewRoman(rPr, false)) styles++;
     }
-    // The Normal style anchors every inherited size: 12 pt per the standards.
-    const normal = descendants(root, "w:style").find((s) => s.getAttribute("w:type") === "paragraph" && s.getAttribute("w:default") === "1");
-    if (normal) {
-      const rPr = setOrderedChild(normal, "w:rPr", STYLE_ORDER, {}, false);
-      if (forceSize(rPr, 24)) styles++;
-    }
+    // The Normal style's size is deliberately left alone: table text (NDE Observations tables at
+    // 11 pt, for one) often inherits from it, so resizing Normal silently resized those too.
   }
   if (runs || styles) {
     const parts = [runs ? `${runs} text run${runs === 1 ? "" : "s"}` : "", styles ? `${styles} style${styles === 1 ? "" : "s"}` : ""].filter(Boolean);
     log.add("formatting", { note: `Set ${parts.join(" and ")} to Times New Roman.` });
+  }
+}
+
+// --- Cover page: title 44 pt, everything else 22 pt (Brett, 2026-10-12) ---
+
+function maxExplicitSize(p: Element): number {
+  let max = 0;
+  for (const run of runsWithText(p)) {
+    const sz = Number(getVal(firstChild(firstChild(run, "w:rPr") ?? run, "w:sz")) ?? 0);
+    if (sz > max) max = sz;
+  }
+  return max;
+}
+
+function applyCoverSizes({ model, log }: FormattingContext) {
+  const cover = model.paragraphs.filter((p) => p.zone === "cover" && runsWithText(p.el).length > 0);
+  if (!cover.length) return;
+  // The title is the cover's largest text (normally "Borescope Inspection Report"); with no
+  // explicit sizes to go on, fall back to the paragraph that reads like a report title.
+  let title = cover.reduce((best, p) => (maxExplicitSize(p.el) > maxExplicitSize(best.el) ? p : best), cover[0]);
+  if (maxExplicitSize(title.el) === 0) title = cover.find((p) => /\breport\b/i.test(p.text)) ?? title;
+  let changed = 0;
+  for (const p of cover) {
+    const target = p === title ? 88 : 44;
+    for (const run of runsWithText(p.el)) if (forceSize(ensurePropsFirst(run, "w:rPr"), target)) changed++;
+    const markRPr = ensureParagraphMarkRPr(p.el);
+    forceSize(markRPr, target);
+  }
+  if (changed) {
+    log.add("formatting", {
+      location: "Cover page",
+      note: `Cover page set to 44 pt for the title ("${title.text.trim().slice(0, 60)}") and 22 pt for the other lines.`,
+    });
   }
 }
 
@@ -135,7 +172,10 @@ function applyBodySizes({ model, log }: FormattingContext) {
   for (const p of model.paragraphs) {
     if (p.zone !== "body" && p.zone !== "llc") continue;
     if (p.headingLevel) continue;
-    if (p.table?.kind === "photo") continue; // handled by applyPhotoTables
+    // Tables keep whatever size they have, except Observations tables (always 11 pt); photo
+    // tables are handled by applyPhotoTables. Forcing other tables to 12 pt turned NDE reports'
+    // 11 pt Observations tables into 12 pt.
+    if (p.table && p.table.kind !== "observation") continue;
     if (!p.table && p.h1 && normalizeHeading(p.h1) === "photos") continue;
     const target = p.table?.kind === "observation" ? 22 : 24;
     for (const run of runsWithText(p.el)) {

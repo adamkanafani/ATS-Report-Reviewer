@@ -27,6 +27,7 @@ import {
 } from "./ai";
 import { applyFormatting, ensureHeadingStyles, setParagraphStyle } from "./formatting";
 import { resamplePhotos } from "./images";
+import { parseHeaderFooterRels } from "./layout";
 import { buildModel, DocModel, locationLabel, normalizeHeading, ParaInfo, PHOTO_CAPTION_LABELS, refreshHeadingContext } from "./model";
 import { applyRedline, readParagraph } from "./redline";
 import { ReviewLog } from "./report";
@@ -213,7 +214,8 @@ export async function runReview(input: Buffer, options: ReviewOptions, progress:
   const model = buildModel(documentXml, stylesXml);
 
   progress("Applying formatting rules...");
-  const { hasToc } = applyFormatting({ documentXml, stylesXml, model, log, options });
+  const relsXml = (await zip.file("word/_rels/document.xml.rels")?.async("text")) ?? "";
+  const { hasToc } = applyFormatting({ documentXml, stylesXml, model, log, options, headerFooterRels: parseHeaderFooterRels(relsXml) });
 
   // --- AI passes ---
   const aiWanted = options.proofreading || options.overallAssessment || options.crossCheck || options.headings;

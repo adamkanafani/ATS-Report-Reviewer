@@ -897,3 +897,15 @@ button.generate-report:active:not(:disabled) {
 .change-diff .ins {
   color: #ff0000;
 }
+
+/* Which build is running -- lets anyone confirm Update.bat actually took. */
+.app-version {
+  margin: -12px 0 16px;
+  color: #8a8a8a;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+}
+
+.app-header .app-version {
+  margin: 0;
+}

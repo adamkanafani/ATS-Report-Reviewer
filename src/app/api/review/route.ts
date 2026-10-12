@@ -38,7 +38,9 @@ export async function POST(request: NextRequest) {
   }
 
   const options: ReviewOptions = { ...DEFAULT_OPTIONS, ...(typeof optionsRaw === "string" ? JSON.parse(optionsRaw) : {}) };
-  const outputFileName = originalName.replace(/\.docx$/i, "") + " - Reviewed.docx";
+  // Same name as the inspector's file, so it's ready to file without renaming (Brett's request).
+  // It downloads to the browser's Downloads folder, so the original is never overwritten.
+  const outputFileName = originalName;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({

@@ -114,6 +114,21 @@ export function paragraphStyleId(p: Element): string | null {
   return pPr ? getVal(firstChild(pPr, "w:pStyle")) : null;
 }
 
+const observationHeaderCache = new WeakMap<Element, boolean>();
+
+/** True when a table's first row reads like an Observations-table header ("Observation",
+ *  "Percent of Component Inspected", "Indication"). Deliberately not "Condition" alone -- the
+ *  Overall Assessment table's header is "Section | Condition" and must stay 12 pt. */
+function isObservationHeaderRow(tbl: Element): boolean {
+  const cached = observationHeaderCache.get(tbl);
+  if (cached !== undefined) return cached;
+  const firstRow = childrenThroughWrappers(tbl, "w:tr")[0];
+  const header = firstRow ? textOf(firstRow) : "";
+  const result = /\bobservations?\b|percent\s+(of\s+)?(component\s+)?inspected|\bindications?\b/i.test(header);
+  observationHeaderCache.set(tbl, result);
+  return result;
+}
+
 function hasPicture(el: Element): boolean {
   return descendants(el, "w:drawing").length > 0 || descendants(el, "w:pict").length > 0;
 }
@@ -216,9 +231,11 @@ export function buildModel(documentXml: Document, stylesXml: Document | null): D
     if (raw.table) {
       // The cover page is itself a table holding the ATS logo -- it must not be treated as a
       // photo table, or its 40/22 pt title block gets flattened to the photo-caption 12 pt.
+      // Observations tables are recognized by their heading, or -- for NDE and other one-off
+      // reports that title the section differently -- by their column headers.
       const kind: TableKind = photoTopTables.has(raw.table.topTbl) && zone !== "cover" && zone !== "toc"
         ? "photo"
-        : h1 && normalizeHeading(h1) === "observations"
+        : zone === "body" && ((h1 && normalizeHeading(h1) === "observations") || isObservationHeaderRow(raw.table.topTbl))
           ? "observation"
           : "other";
       table = { ...raw.table, kind };
