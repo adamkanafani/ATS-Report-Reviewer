@@ -318,9 +318,17 @@ function ResultsScreen({ source, result, onReviewAnother }: { source: ReportSour
           {result.aiEditCount} AI edit{result.aiEditCount === 1 ? "" : "s"} in red · {result.commentCount} comment
           {result.commentCount === 1 ? "" : "s"} for review
         </span>
-        <button className="generate-report" onClick={download}>
-          Download Reviewed Report
-        </button>
+        {/* The report already downloaded automatically when this screen opened -- confirm that
+            instead of offering a second big download button. The link is only for a download
+            the browser blocked or that got lost. */}
+        <span className="download-status">
+          <span>
+            ✓ Saved to your Downloads folder: <strong>{result.outputFileName}</strong>
+          </span>
+          <button type="button" className="download-again" onClick={download}>
+            Download again
+          </button>
+        </span>
       </footer>
     </div>
   );

@@ -909,3 +909,30 @@ button.generate-report:active:not(:disabled) {
 .app-header .app-version {
   margin: 0;
 }
+
+/* Results footer: confirms the automatic download instead of a second download button. */
+.download-status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #dff5e1;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.download-status strong {
+  color: #ffffff;
+}
+
+button.download-again {
+  padding: 6px 12px;
+  font-size: 13px;
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: none;
+}
+
+button.download-again:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}

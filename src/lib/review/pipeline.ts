@@ -373,8 +373,14 @@ export async function runReview(input: Buffer, options: ReviewOptions, progress:
           const anchor = anchors.get(f.anchorId);
           const label = labels[f.type] ?? "Check";
           log.add("crossCheck", {
-            location: anchor ? anchor.line.split(" | ")[1] || undefined : undefined,
-            before: anchor ? shorten(anchor.line.split(" | ").slice(2).join(" | "), 200) : undefined,
+            // Recommendation lines are "REC-n | text" (no section column), table/photo lines are
+            // "id | section | details".
+            location: anchor
+              ? anchor.id.startsWith("REC-")
+                ? "Significant Observations and Recommendations"
+                : anchor.line.split(" | ")[1] || undefined
+              : undefined,
+            before: anchor ? shorten(anchor.line.split(" | ").slice(anchor.id.startsWith("REC-") ? 1 : 2).join(" | "), 200) : undefined,
             note: `${label}: ${f.message}`,
             level: "attention",
           });

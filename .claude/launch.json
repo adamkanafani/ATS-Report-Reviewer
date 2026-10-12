@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3200
+    },
+    {
+      "name": "ats-report-reviewer-test",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev", "-p", "3201"],
+      "port": 3201
     }
   ]
 }
