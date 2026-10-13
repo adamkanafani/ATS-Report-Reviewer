@@ -9,7 +9,7 @@
  *  - Remove photo-table cells sitting entirely in the margin. Word hides them on screen, but they
  *    print in the PDF (e.g. a stray "Basket" to the right of a caption table).
  */
-import { childrenThroughWrappers, createW, descendants, elementChildren, firstChild, getVal, setAttr, textOf } from "../docx/ooxml";
+import { childrenThroughWrappers, createW, descendants, elementChildren, firstChild, getVal, setAttr, setOrderedChild, TBLPR_ORDER, textOf } from "../docx/ooxml";
 import { DocModel, normalizeHeading } from "./model";
 import type { ReviewLog } from "./report";
 
@@ -198,7 +198,25 @@ export function applyPhotoSectionLayout(documentXml: Document, model: DocModel, 
       : "Photos section margins were already Narrow (0.5\").",
   });
 
-  // 3. Remove photo-table cells that sit entirely in the right margin.
+  // 3. Re-seat photo tables inside the new margins. Under 1" margins inspectors drag the photo
+  // tables out into the left margin (Stony Brook GT1C: indent -851, 7.78" wide); with 0.5"
+  // margins that same indent puts the photos at the very edge of the page.
+  let refitted = 0;
+  for (const s of photoSections) {
+    const usable = usableWidth(s.sectPr);
+    for (const el of children.slice(s.start, s.end + 1)) {
+      if (el.tagName !== "w:tbl") continue;
+      if (!descendants(el, "w:drawing").length && !descendants(el, "w:pict").length) continue;
+      if (fitTableToWidth(el, usable)) refitted++;
+    }
+  }
+  if (refitted) {
+    log.add("photos", {
+      note: `Moved ${refitted} photo table${refitted === 1 ? "" : "s"} back inside the page margins (they were shifted into the left margin or wider than the page).`,
+    });
+  }
+
+  // 4. Remove photo-table cells that sit entirely in the right margin.
   let removed = 0;
   const removedText: string[] = [];
   for (const s of photoSections) {
@@ -219,6 +237,70 @@ export function applyPhotoSectionLayout(documentXml: Document, model: DocModel, 
         .join(", ")}${removedText.length > 6 ? ", ..." : ""}.`,
     });
   }
+}
+
+function usableWidth(sectPr: Element): number {
+  const pgSz = firstChild(sectPr, "w:pgSz");
+  const pgMar = firstChild(sectPr, "w:pgMar");
+  return Number(pgSz?.getAttribute("w:w") ?? 12240) - Number(pgMar?.getAttribute("w:left") ?? 0) - Number(pgMar?.getAttribute("w:right") ?? 0);
+}
+
+/** ATS's photo tables sit 108 dxa (0.075") in from the margin, cancelling their zero cell padding. */
+const PHOTO_TABLE_INDENT = 108;
+
+function gridWidth(tbl: Element): number {
+  const grid = firstChild(tbl, "w:tblGrid");
+  if (!grid) return 0;
+  return elementChildren(grid)
+    .filter((c) => c.tagName === "w:gridCol")
+    .reduce((sum, c) => sum + Number(c.getAttribute("w:w") || 0), 0);
+}
+
+/** Scales a table's columns (grid + this table's own cell widths) by `factor`. */
+function scaleColumns(tbl: Element, factor: number) {
+  const grid = firstChild(tbl, "w:tblGrid");
+  if (grid) {
+    for (const col of elementChildren(grid)) {
+      if (col.tagName === "w:gridCol") setAttr(col, "w:w", String(Math.floor(Number(col.getAttribute("w:w") || 0) * factor)));
+    }
+  }
+  const tblPr = firstChild(tbl, "w:tblPr");
+  const tblW = tblPr ? firstChild(tblPr, "w:tblW") : null;
+  if (tblW && tblW.getAttribute("w:type") === "dxa") setAttr(tblW, "w:w", String(Math.floor(Number(tblW.getAttribute("w:w") || 0) * factor)));
+  for (const row of childrenThroughWrappers(tbl, "w:tr")) {
+    for (const tc of childrenThroughWrappers(row, "w:tc")) {
+      const tcPr = firstChild(tc, "w:tcPr");
+      const tcW = tcPr ? firstChild(tcPr, "w:tcW") : null;
+      if (tcW && tcW.getAttribute("w:type") === "dxa") setAttr(tcW, "w:w", String(Math.floor(Number(tcW.getAttribute("w:w") || 0) * factor)));
+      // A nested caption table must still fit its (now narrower) cell.
+      const cellW = tcW ? Number(tcW.getAttribute("w:w") || 0) : 0;
+      for (const inner of elementChildren(tc).filter((c) => c.tagName === "w:tbl")) {
+        const innerW = gridWidth(inner);
+        if (cellW && innerW > cellW) scaleColumns(inner, cellW / innerW);
+      }
+    }
+  }
+}
+
+/** Puts a top-level photo table back at the standard indent, shrinking it to the usable width
+ *  when it's wider. Returns true if anything changed. Floating tables are left alone. */
+function fitTableToWidth(tbl: Element, usable: number): boolean {
+  const tblPr = firstChild(tbl, "w:tblPr");
+  if (!tblPr || firstChild(tblPr, "w:tblpPr")) return false;
+  const indEl = firstChild(tblPr, "w:tblInd");
+  const indent = dxa(indEl);
+  const tblWEl = firstChild(tblPr, "w:tblW");
+  const width = dxa(tblWEl) || gridWidth(tbl);
+  if (!width) return false;
+  const fits = indent >= 0 && indent + width <= usable;
+  if (fits) return false;
+  const target = usable - PHOTO_TABLE_INDENT;
+  if (width > target) scaleColumns(tbl, target / width);
+  setOrderedChild(tblPr, "w:tblInd", TBLPR_ORDER, { "w:w": String(PHOTO_TABLE_INDENT), "w:type": "dxa" });
+  // A centered/right-aligned table ignores the indent; ATS photo tables are left-aligned.
+  const jc = firstChild(tblPr, "w:jc");
+  if (jc) tblPr.removeChild(jc);
+  return true;
 }
 
 function dxa(el: Element | null, attr = "w:w"): number {
