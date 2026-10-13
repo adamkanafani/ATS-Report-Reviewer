@@ -936,3 +936,126 @@ button.download-again {
 button.download-again:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.12);
 }
+
+/* --- Several reports at once --- */
+
+.folder-list .file-row {
+  display: flex;
+  align-items: center;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.folder-list .file-row:nth-child(even) {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.folder-list .file-row input {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-left: 16px;
+  accent-color: #e0464d;
+  cursor: pointer;
+}
+
+.folder-list .file-row button {
+  margin-bottom: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.folder-list .file-row.ticked {
+  background: rgba(164, 35, 43, 0.35);
+}
+
+.ticked-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+button.link-button {
+  margin-left: 10px;
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+  color: #ff8a90;
+  font-size: 13px;
+  text-decoration: underline;
+}
+
+button.link-button:hover:not(:disabled) {
+  background: none;
+  box-shadow: none;
+  color: #ffffff;
+}
+
+.source-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.source-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.source-list .job-path {
+  margin: 0;
+}
+
+button.add-more {
+  margin-top: 10px;
+  padding: 5px 12px;
+  font-size: 13px;
+}
+
+.modal-checkbox-row.compare-row {
+  background: rgba(164, 35, 43, 0.25);
+  border: 1px solid rgba(224, 70, 77, 0.4);
+}
+
+/* Results: one tab per report, plus the comparison. */
+.report-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 12px;
+  background: #0d0d0d;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  overflow-x: auto;
+  position: relative;
+  z-index: 1;
+}
+
+button.report-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px 8px 0 0;
+  background: rgba(255, 255, 255, 0.06);
+  color: #d9d9d9;
+  font-size: 13px;
+  box-shadow: none;
+}
+
+button.report-tab:hover:not(:disabled) {
+  background: rgba(164, 35, 43, 0.5);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+button.report-tab.active {
+  background: #ffffff;
+  color: #a4232b;
+}

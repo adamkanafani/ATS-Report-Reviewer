@@ -20,6 +20,17 @@ the report reviewer. Same shell and look as the ATS Borescope Report Builder.
 | Photo resolution | Every photo resampled to 150 ppi at its displayed size, operational data photo(s) excluded; the document's default resolution is also set to 150 ppi |
 | Text color | Everything black, **except AI edits, which are red** for review |
 
+### Several reports for the same unit
+
+Tick several reports in the file browser (or upload/drop several) to review them together --
+e.g. the borescope, PT, ECI and UT reports for one unit. Each gets the full review above and
+downloads under its own name, and the reports are also **compared with each other**: the
+Inspection Details (Utility, Site, Unit, Serial Number, Type of Fuel, Site Contact, operational
+data), the visual observations for components more than one report covers (Inlet, VIGV, first
+compressor stages) and the significant findings for them must match. Each mismatch becomes a
+Word comment in every report involved and is listed on the results screen's Report Comparison
+tab.
+
 It also lists template placeholders still in the report (X, XX, 20XX, "Choose an item.").
 It never fills those in. The original file is never modified. The reviewed copy downloads
 under its original file name (to the browser's Downloads folder), and the app shows a read-only log of every change.

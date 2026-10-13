@@ -46,7 +46,8 @@ async function finalMessage(system: string, user: string, schema: Record<string,
   }
 }
 
-async function callJson<T>(system: string, user: string, schema: Record<string, unknown>, effort: Effort): Promise<T> {
+/** One structured-output Claude call: system + user text in, schema-validated JSON out. */
+export async function callStructured<T>(system: string, user: string, schema: Record<string, unknown>, effort: Effort): Promise<T> {
   let message;
   try {
     message = await finalMessage(system, user, schema, effort);
@@ -150,7 +151,7 @@ ${HOUSE_STYLE}
 
 ${EDIT_RULES}`;
   const user = `Proofread these report items. Each has an id, where it appears in the report, and its text.\n\n${JSON.stringify(items, null, 1)}`;
-  const result = await callJson<{ edits: ProofEdit[] }>(system, user, PROOF_SCHEMA, "medium");
+  const result = await callStructured<{ edits: ProofEdit[] }>(system, user, PROOF_SCHEMA, "medium");
   const valid = new Set(items.map((i) => i.id));
   return result.edits.filter((e) => valid.has(e.id));
 }
@@ -189,7 +190,7 @@ ${HOUSE_STYLE}
 
 ${EDIT_RULES}`;
   const user = `Overall Assessment items:\n${JSON.stringify(items, null, 1)}\n\nFor reference only (do not edit), the rest of the report's findings:\n${supportingContext}`;
-  const result = await callJson<AssessmentResult>(system, user, ASSESSMENT_SCHEMA, "high");
+  const result = await callStructured<AssessmentResult>(system, user, ASSESSMENT_SCHEMA, "high");
   const valid = new Set(items.map((i) => i.id));
   return { edits: result.edits.filter((e) => valid.has(e.id)), recommendations: result.recommendations.slice(0, 8) };
 }
@@ -247,7 +248,7 @@ Attach each finding to the most relevant id: the Observations-table row (OBS-n) 
 
 The message is read by the report reviewer as a Word comment, where these ids don't exist. Never write an id in the message -- refer to rows by their label ("the R4 row") and to photos by their caption ("the Stage 4 Rotor Blade, Leading Edge Pressure Side photo").`;
   const user = `OBSERVATIONS TABLES (one line per row: id | section | cells):\n${observationRows}\n\nPHOTO TABLES (one line per photo: id | section | caption fields):\n${photoEntries}\n\nSIGNIFICANT OBSERVATIONS AND RECOMMENDATIONS (one line per paragraph: id | text):\n${recommendations || "(none in this report)"}`;
-  const result = await callJson<{ findings: CrossCheckFinding[] }>(system, user, CROSSCHECK_SCHEMA, "high");
+  const result = await callStructured<{ findings: CrossCheckFinding[] }>(system, user, CROSSCHECK_SCHEMA, "high");
   return result.findings;
 }
 
@@ -294,7 +295,7 @@ Your job: check that every heading in the report has the correct Word Style sele
 - Normal: Notes, body text, labels, and a section name repeated at the top of a later page as a "continued" label (only the first occurrence of each subsection name is a heading).
 You're given the report outline: short paragraphs outside tables with their current style. Return a fix ONLY where the current style is clearly wrong. One-off reports may have their own section names -- judge by the paragraph's role in the outline, not just its wording.`;
   const user = `Report outline (id | current style | text), in document order:\n${outline.map((o) => `${o.id} | ${o.style} | ${o.text}`).join("\n")}`;
-  const result = await callJson<{ fixes: HeadingFix[] }>(system, user, HEADING_SCHEMA, "medium");
+  const result = await callStructured<{ fixes: HeadingFix[] }>(system, user, HEADING_SCHEMA, "medium");
   const valid = new Set(outline.map((o) => o.id));
   return result.fixes.filter((f) => valid.has(f.id));
 }

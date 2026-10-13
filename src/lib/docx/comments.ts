@@ -5,11 +5,48 @@
  * instead of being typed into the customer-facing report itself.
  */
 import type JSZip from "jszip";
-import { createW, descendants, firstChild, parseXml, serializeXml, W_NS, XML_NS } from "./ooxml";
+import { createW, descendants, firstChild, parseXml, serializeXml, textOf, W_NS, XML_NS } from "./ooxml";
 
 const COMMENTS_REL_TYPE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments";
 const COMMENTS_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml";
 export const COMMENT_AUTHOR = "ATS Report Reviewer (AI)";
+
+/** Content controls whose contents must stay plain text. Word declares a document corrupt if a
+ *  comment is anchored inside one (found on the Inspection Details "Type of Fuel" combo box). */
+const RESTRICTED_CONTROLS = ["w:comboBox", "w:dropDownList", "w:date", "w:text", "w14:checkbox", "w:picture", "w:docPartList", "w:docPartObj"];
+
+function inRestrictedControl(el: Element): boolean {
+  for (let node = el.parentNode as Element | null; node && node.nodeType === 1; node = node.parentNode as Element | null) {
+    if (node.tagName !== "w:sdt") continue;
+    const sdtPr = firstChild(node, "w:sdtPr");
+    if (sdtPr && RESTRICTED_CONTROLS.some((tag) => firstChild(sdtPr, tag))) return true;
+  }
+  return false;
+}
+
+function closest(el: Element, tagName: string): Element | null {
+  for (let node = el.parentNode as Element | null; node && node.nodeType === 1; node = node.parentNode as Element | null) {
+    if (node.tagName === tagName) return node;
+  }
+  return null;
+}
+
+/** `p` itself when a comment can go there; otherwise another paragraph in the same table row
+ *  (the next cell, then the previous), otherwise the nearest earlier paragraph in the document. */
+function safeAnchor(p: Element): Element {
+  if (!inRestrictedControl(p)) return p;
+  const row = closest(p, "w:tr");
+  if (row) {
+    const rowParas = descendants(row, "w:p");
+    const i = rowParas.indexOf(p);
+    const ordered = [...rowParas.slice(i + 1), ...rowParas.slice(0, i).reverse()];
+    const inRow = ordered.find((q) => !inRestrictedControl(q) && textOf(q).trim()) ?? ordered.find((q) => !inRestrictedControl(q));
+    if (inRow) return inRow;
+  }
+  const all = descendants(p.ownerDocument.documentElement, "w:p");
+  for (let i = all.indexOf(p) - 1; i >= 0; i--) if (!inRestrictedControl(all[i])) return all[i];
+  return p;
+}
 
 export class CommentWriter {
   private commentsDoc: Document | null = null;
@@ -32,9 +69,11 @@ export class CommentWriter {
     }
   }
 
-  /** Anchors a comment spanning the whole of paragraph `p`. */
-  add(p: Element, text: string) {
+  /** Anchors a comment spanning the whole of paragraph `p` (or the nearest paragraph that can
+   *  legally hold one -- see safeAnchor). */
+  add(target: Element, text: string) {
     if (!this.commentsDoc) throw new Error("CommentWriter.init() not called");
+    const p = safeAnchor(target);
     const id = String(this.nextId++);
     const doc = p.ownerDocument;
 

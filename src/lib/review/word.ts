@@ -54,7 +54,17 @@ export interface WordTocResult {
   error?: string;
 }
 
-export async function updateTocWithWord(input: Buffer, timeoutMs = 5 * 60 * 1000): Promise<WordTocResult> {
+// One Word automation at a time: when several reports are reviewed together, two scripts would
+// attach to the same Word instance and the first to finish would quit Word under the other.
+let wordQueue: Promise<unknown> = Promise.resolve();
+
+export function updateTocWithWord(input: Buffer, timeoutMs = 5 * 60 * 1000): Promise<WordTocResult> {
+  const run = wordQueue.then(() => updateTocWithWordNow(input, timeoutMs));
+  wordQueue = run.catch(() => undefined);
+  return run;
+}
+
+async function updateTocWithWordNow(input: Buffer, timeoutMs: number): Promise<WordTocResult> {
   if (process.platform !== "win32") return { ok: false, tocCount: 0, error: "Microsoft Word automation is only available on Windows." };
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ats-reviewer-"));
   const docPath = path.join(dir, `${randomUUID()}.docx`);

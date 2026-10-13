@@ -1,6 +1,7 @@
 /** Shared between the review engine and the results screen. */
 
 export type ReviewCategoryKey =
+  | "crossReport"
   | "proofreading"
   | "overallAssessment"
   | "crossCheck"
@@ -40,6 +41,8 @@ export interface ReviewOptions {
   photoTables: boolean;
   toc: boolean;
   photoResolution: boolean;
+  /** With two or more reports: check that the details/observations that must match do. */
+  compareReports: boolean;
 }
 
 export const DEFAULT_OPTIONS: ReviewOptions = {
@@ -51,11 +54,14 @@ export const DEFAULT_OPTIONS: ReviewOptions = {
   photoTables: true,
   toc: true,
   photoResolution: true,
+  compareReports: true,
 };
 
 export interface ReviewResult {
   jobId: string;
   outputFileName: string;
+  /** Set when this report couldn't be reviewed (the others in the batch still were). */
+  error?: string;
   categories: ReviewCategory[];
   aiEditCount: number;
   commentCount: number;
@@ -63,5 +69,5 @@ export interface ReviewResult {
 
 export type ProgressEvent =
   | { type: "step"; message: string }
-  | { type: "done"; result: ReviewResult }
+  | { type: "done"; results: ReviewResult[]; comparison: ReviewCategory | null }
   | { type: "error"; message: string };

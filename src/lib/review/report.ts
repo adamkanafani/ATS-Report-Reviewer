@@ -1,6 +1,10 @@
 import type { ReviewCategory, ReviewCategoryKey, ReviewItem } from "./types";
 
 const CATEGORY_META: Record<ReviewCategoryKey, { title: string; summary: string }> = {
+  crossReport: {
+    title: "Cross-Report Check",
+    summary: "Details and observations that must match the other reports for this unit but don't. Each one is also a Word comment in the report.",
+  },
   proofreading: {
     title: "Spelling & Grammar",
     summary: "Spelling, grammar, and ATS observation-style corrections. Every changed word is red in the report.",
@@ -36,6 +40,7 @@ const CATEGORY_META: Record<ReviewCategoryKey, { title: string; summary: string 
 };
 
 export const CATEGORY_ORDER: ReviewCategoryKey[] = [
+  "crossReport",
   "crossCheck",
   "overallAssessment",
   "proofreading",
