@@ -25,6 +25,7 @@ import {
   TBLPR_ORDER,
 } from "../docx/ooxml";
 import { DocModel, locationLabel, normalizeHeading, ParaInfo, PHOTO_CAPTION_LABELS, refreshHeadingContext } from "./model";
+import { cleanPhotoCaptions } from "./captions";
 import { applyPhotoSectionLayout, HeaderFooterRel } from "./layout";
 import type { ReviewLog } from "./report";
 import type { ReviewOptions } from "./types";
@@ -82,6 +83,7 @@ export function applyFormatting(ctx: FormattingContext): { hasToc: boolean } {
     applyPercentCells(ctx);
   }
   if (options.photoTables) {
+    cleanPhotoCaptions(ctx.model, ctx.log);
     applyPhotoTables(ctx);
     applyPhotoSectionLayout(ctx.documentXml, ctx.model, ctx.log, ctx.headerFooterRels ?? []);
   }

@@ -114,6 +114,17 @@ export function paragraphStyleId(p: Element): string | null {
   return pPr ? getVal(firstChild(pPr, "w:pStyle")) : null;
 }
 
+/** Headings whose tables hold inspection findings: "Observations" in borescope reports, and the
+ *  NDE reports' own result sections -- "Visual Observations", "Penetrant / Ultrasonic / Eddy
+ *  Current Inspection Results", "Indications" (Brett, 2026-11-10). Never "Significant
+ *  Observations and Recommendations", which is narrative. */
+export function isResultsHeading(heading: string | null): boolean {
+  if (!heading) return false;
+  const h = normalizeHeading(heading);
+  if (/significant|recommendation|assessment/.test(h)) return false;
+  return /\bobservations?$|\bresults?$|\bindications?$|\bfindings$/.test(h);
+}
+
 const observationHeaderCache = new WeakMap<Element, boolean>();
 
 /** True when a table's first row reads like an Observations-table header ("Observation",
@@ -235,7 +246,7 @@ export function buildModel(documentXml: Document, stylesXml: Document | null): D
       // reports that title the section differently -- by their column headers.
       const kind: TableKind = photoTopTables.has(raw.table.topTbl) && zone !== "cover" && zone !== "toc"
         ? "photo"
-        : zone === "body" && ((h1 && normalizeHeading(h1) === "observations") || isObservationHeaderRow(raw.table.topTbl))
+        : zone === "body" && (isResultsHeading(h1) || isResultsHeading(h2) || isObservationHeaderRow(raw.table.topTbl))
           ? "observation"
           : "other";
       table = { ...raw.table, kind };

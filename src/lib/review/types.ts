@@ -5,6 +5,7 @@ export type ReviewCategoryKey =
   | "proofreading"
   | "overallAssessment"
   | "crossCheck"
+  | "photoDates"
   | "headings"
   | "formatting"
   | "photos"
@@ -41,6 +42,8 @@ export interface ReviewOptions {
   photoTables: boolean;
   toc: boolean;
   photoResolution: boolean;
+  /** Compare each photo's date stamp with the inspection date. */
+  photoDates: boolean;
   /** With two or more reports: check that the details/observations that must match do. */
   compareReports: boolean;
 }
@@ -54,6 +57,7 @@ export const DEFAULT_OPTIONS: ReviewOptions = {
   photoTables: true,
   toc: true,
   photoResolution: true,
+  photoDates: true,
   compareReports: true,
 };
 

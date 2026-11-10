@@ -27,6 +27,7 @@ import {
 } from "./ai";
 import { applyFormatting, ensureHeadingStyles, setParagraphStyle } from "./formatting";
 import { resamplePhotos } from "./images";
+import { checkPhotoDates } from "./photodates";
 import { parseHeaderFooterRels } from "./layout";
 import { buildModel, DocModel, locationLabel, normalizeHeading, ParaInfo, PHOTO_CAPTION_LABELS, refreshHeadingContext } from "./model";
 import { applyRedline, readParagraph } from "./redline";
@@ -221,6 +222,14 @@ export async function runReview(input: Buffer, options: ReviewOptions, progress:
   const aiWanted = options.proofreading || options.overallAssessment || options.crossCheck || options.headings;
   const comments = new CommentWriter(zip);
   await comments.init();
+
+  // Photo date stamps: started now so the stamp reading runs alongside the other AI checks.
+  let photoDatesPromise: ReturnType<typeof checkPhotoDates> | null = null;
+  if (options.photoDates) {
+    progress("Checking photo date stamps against the inspection date...");
+    photoDatesPromise = checkPhotoDates(zip, model);
+    photoDatesPromise.catch(() => {});
+  }
   let aiEditCount = 0;
 
   if (aiWanted && !hasApiKey()) {
@@ -392,6 +401,28 @@ export async function runReview(input: Buffer, options: ReviewOptions, progress:
       } else if (crossResult.status === "rejected") {
         log.add("crossCheck", { note: `Photo vs. observation check failed: ${(crossResult.reason as Error).message}`, level: "attention" });
       }
+    }
+  }
+
+  // --- Photo date stamps -> comments ---
+  if (photoDatesPromise) {
+    try {
+      const dates = await photoDatesPromise;
+      if (dates.skippedReason && !dates.checked) log.skip("photoDates", dates.skippedReason);
+      for (const f of dates.findings) {
+        comments.add(f.anchor, `Photo date check: ${f.message}`);
+        log.add("photoDates", { location: f.where, note: f.message, level: "attention" });
+      }
+      if (dates.checked) {
+        log.add("photoDates", {
+          note: `Read the date on ${dates.dated} of ${dates.checked} photos and compared it with the inspection date (${dates.inspectionDate})${
+            dates.findings.length ? "" : " -- all match"
+          }.${dates.skippedReason ? ` ${dates.skippedReason}` : ""}`,
+        });
+      }
+      log.touch("photoDates");
+    } catch (err) {
+      log.add("photoDates", { note: `Photo date check failed: ${err instanceof Error ? err.message : err}`, level: "attention" });
     }
   }
 

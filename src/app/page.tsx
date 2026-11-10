@@ -25,6 +25,7 @@ const CHECKS: { key: keyof ReviewOptions; label: string; ai?: boolean }[] = [
   { key: "formatting", label: "Correct formatting (fonts, sizes, 7\" tables, all text black)" },
   { key: "proofreading", label: "Spell check and grammar review of all text", ai: true },
   { key: "crossCheck", label: "Confirm photo-table observations match the Observations tables", ai: true },
+  { key: "photoDates", label: "Check photo date stamps against the inspection date", ai: true },
   { key: "overallAssessment", label: "Review the Overall Assessment for readability", ai: true },
   { key: "headings", label: "Check every heading's Style selection" },
   { key: "photoTables", label: "Set all photo-table text to Times New Roman 12" },
@@ -479,6 +480,7 @@ function categoryCountLabel(cat: ReviewCategory): string {
       return `${n} change${n === 1 ? "" : "s"}`;
     case "crossReport":
     case "crossCheck":
+    case "photoDates":
     case "placeholders":
       return `${cat.items.filter((i) => i.level === "attention").length} to check`;
     case "headings":

@@ -33,6 +33,10 @@ const CATEGORY_META: Record<ReviewCategoryKey, { title: string; summary: string 
     title: "Table of Contents",
     summary: "Table of Contents update and formatting (Times New Roman 12, 1.5 spacing, black).",
   },
+  photoDates: {
+    title: "Photo Date Stamps",
+    summary: "Photos whose date stamp doesn't match the report's inspection date -- often left over from an old report. Each one is also a Word comment on the photo.",
+  },
   placeholders: {
     title: "Unfilled Placeholders",
     summary: "Template placeholder text still in the report (X, XX, 20XX, \"Choose an item.\"). Nothing was changed here -- these need the inspector's actual values.",
@@ -42,6 +46,7 @@ const CATEGORY_META: Record<ReviewCategoryKey, { title: string; summary: string 
 export const CATEGORY_ORDER: ReviewCategoryKey[] = [
   "crossReport",
   "crossCheck",
+  "photoDates",
   "overallAssessment",
   "proofreading",
   "placeholders",

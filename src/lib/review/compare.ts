@@ -73,12 +73,16 @@ export function extractForComparison(model: DocModel): Extracted {
   for (const p of model.paragraphs) {
     if (p.table?.kind !== "observation" || p.table.nested || seenRows.has(p.table.row)) continue;
     seenRows.add(p.table.row);
-    if (p.h2 && !/inlet|compressor|igv|guide vane/i.test(p.h2)) continue;
+    // Hot-section components never overlap with the NDE inspections; everything else -- the
+    // borescope Observations and the NDE reports' Visual Observations / Penetrant / Ultrasonic /
+    // Eddy Current Inspection Results tables -- is compared.
+    if (p.h2 && /combustion|turbine|exhaust|generator|liner|transition|bucket|nozzle/i.test(p.h2)) continue;
     const cells = childrenThroughWrappers(p.table.row, "w:tc");
     const text = cells.map((c) => clean(textOf(c))).join(" | ");
     const anchorCell = cells[cells.length > 1 ? 1 : 0];
     const anchor = anchorCell ? firstTextParagraph(anchorCell) : null;
-    if (text.replace(/[|\s]/g, "") && anchor) out.O.push({ text: `${p.h2 ?? p.h1 ?? ""} | ${text}`, anchor });
+    const where = [p.h1, p.h2].filter(Boolean).join(" > ");
+    if (text.replace(/[|\s]/g, "") && anchor) out.O.push({ text: `${where} | ${text}`, anchor });
   }
 
   // Significant Observations and Recommendations (NDE reports may say "Significant Findings").
@@ -150,7 +154,7 @@ function describe(r: NamedExtract): string {
     `=== REPORT ${r.letter}: "${r.fileName}" ===`,
     `Cover page: ${r.data.cover || "(none)"}`,
     section("D", "INSPECTION DETAILS (rows)"),
-    section("O", "OBSERVATIONS - Inlet / Compressor (section | cells)"),
+    section("O", "OBSERVATIONS AND NDE INSPECTION RESULTS (heading > subheading | cells)"),
     section("S", "SIGNIFICANT OBSERVATIONS AND RECOMMENDATIONS"),
   ].join("\n");
 }
@@ -160,7 +164,11 @@ export async function compareReports(reports: NamedExtract[]): Promise<CompareFi
 
 Report a finding wherever these do NOT match between reports:
 1. Inspection Details: Utility / Client, Site Name, Unit Number, Serial Number, Type of Fuel, Site Contact, and the Operational Data (total fired hours, starts, fired starts, manual starts, unit trips). Flag any difference in value, even small ones (a typo, a different abbreviation, a transposed digit). Inspection Type, Inspectors and Inspection Date are expected to differ -- don't flag them.
-2. Visual observations for the same component in more than one report -- Inlet, VIGV / IGV, and the first compressor stages (R0-R5, S0-S5 or as present). Compare only components that appear in at least two reports. NDE results (indications found by PT/ECI/UT) are not visual observations and are not expected in the borescope report -- don't flag their absence. Do flag visual findings that contradict each other (different conditions, counts, or locations for the same component), or a visual condition that appears in one report's visual observations but is missing from another report that also lists visual observations for that component.
+2. Observations and inspection results for the same component in more than one report -- Inlet, VIGV / IGV, and the compressor stages (R0-R5, S0-S5 or as present). Each row is labeled with its heading: the borescope report's "Observations", and the NDE reports' "Visual Observations", "Penetrant Inspection Results", "Ultrasonic Inspection Results", "Eddy Current Inspection Results" and similar. Compare only components that appear in at least two reports.
+   - Visual observations must agree across every report that has them (borescope Observations and NDE Visual Observations): flag different conditions, counts, or locations for the same component, or a visual condition in one report that's missing from another report's visual observations for that component.
+   - NDE inspection results (indications found by PT / UT / ECI) must agree with every other report that states results for the same component and method -- e.g. a borescope report or Significant Observations paragraph that quotes the PT findings. Flag different indication counts, locations, sizes or dispositions.
+   - Also flag an NDE indication (e.g. a crack indication on R1) where another report's visual observations for that same component say "No defects identified" -- the reviewer should confirm the two are consistent.
+   - Don't flag an NDE report simply for not repeating every visual observation, or the borescope report for not containing NDE results it never claimed to have.
 3. Significant findings / recommendations for those same components: the same condition should get the same finding and recommendation in every report that covers it. Flag contradictions or a significant finding present in one report but missing from another report that covers that component.
 
 Treat wording that means the same thing as a match ("Impact damage at the leading edge" vs "Leading edge impact damage"). Each finding must list the ids (like A.D2, B.D2) of the rows or paragraphs involved -- one per report that has the item; when a report is missing the item entirely, mention that in the message instead. Name reports by their file names in the message. Return an empty list if everything that should match does.`;

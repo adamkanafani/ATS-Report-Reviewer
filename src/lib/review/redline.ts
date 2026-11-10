@@ -192,8 +192,10 @@ export interface RedlineOutcome {
   deletedWords: number;
 }
 
-/** Rewrites paragraph `p` to read `newText`, coloring inserted text red. */
-export function applyRedline(p: Element, newText: string): RedlineOutcome {
+/** Rewrites paragraph `p` to read `newText`, coloring inserted text red -- unless `markRed` is
+ *  false, for rule-based standardizations (e.g. "Classification" -> "Observation") that aren't
+ *  AI judgement calls and would only add red noise. */
+export function applyRedline(p: Element, newText: string, markRed = true): RedlineOutcome {
   const para = readParagraph(p);
   if (!para.editable) return { applied: false, reason: "paragraph contains a field that spans paragraphs", insertedWords: 0, deletedWords: 0 };
   newText = newText.replace(/\r?\n/g, " ");
@@ -238,7 +240,9 @@ export function applyRedline(p: Element, newText: string): RedlineOutcome {
   let lastRun: Element | null = null;
   let inserted = 0;
   let deleted = 0;
-  const firstRun = (atoms.find((a) => a.kind === "char") as CharAtom | undefined)?.run ?? null;
+  // An empty paragraph (a blank photo-caption cell) has no run to borrow formatting from -- use a
+  // stand-in run carrying the paragraph mark's formatting, which is what Word would type with.
+  const firstRun = (atoms.find((a) => a.kind === "char") as CharAtom | undefined)?.run ?? paragraphMarkRun(p);
 
   for (const op of ops) {
     if (op.op === "eq") {
@@ -258,7 +262,7 @@ export function applyRedline(p: Element, newText: string): RedlineOutcome {
     } else {
       const source = lastRun ?? firstRun;
       if (!source) return { applied: false, reason: "no text run to copy formatting from", insertedWords: 0, deletedWords: 0 };
-      for (const ch of op.tok) out.push({ kind: "char", ch, run: source, red: true });
+      for (const ch of op.tok) out.push({ kind: "char", ch, run: source, red: markRed });
       if (/[\p{L}\p{N}]/u.test(op.tok)) inserted++;
     }
   }
@@ -333,5 +337,23 @@ function buildRun(doc: Document, source: Element, text: string, red: boolean): E
     } else buf += ch;
   }
   flush();
+  return run;
+}
+
+/** A detached run whose rPr copies the paragraph mark's (pPr/rPr), for typing into an empty
+ *  paragraph. Revision-tracking children of the mark don't apply to runs and are dropped. */
+function paragraphMarkRun(p: Element): Element {
+  const doc = p.ownerDocument;
+  const run = createW(doc, "w:r");
+  const pPr = firstChild(p, "w:pPr");
+  const markRPr = pPr ? firstChild(pPr, "w:rPr") : null;
+  if (markRPr) {
+    const rPr = markRPr.cloneNode(true) as Element;
+    for (const tag of ["w:ins", "w:del", "w:moveFrom", "w:moveTo", "w:rPrChange"]) {
+      const el = firstChild(rPr, tag);
+      if (el) rPr.removeChild(el);
+    }
+    run.appendChild(rPr);
+  }
   return run;
 }

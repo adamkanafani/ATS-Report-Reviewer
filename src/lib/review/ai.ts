@@ -21,7 +21,10 @@ function getClient(): Anthropic {
 
 type Effort = "low" | "medium" | "high";
 
-async function finalMessage(system: string, user: string, schema: Record<string, unknown>, effort: Effort) {
+/** The user turn: plain text, or content blocks (text + images) for the photo date-stamp check. */
+export type UserContent = string | Anthropic.Beta.BetaContentBlockParam[];
+
+async function finalMessage(system: string, user: UserContent, schema: Record<string, unknown>, effort: Effort) {
   const params = {
     model: REVIEW_MODEL,
     max_tokens: 64000,
@@ -47,7 +50,7 @@ async function finalMessage(system: string, user: string, schema: Record<string,
 }
 
 /** One structured-output Claude call: system + user text in, schema-validated JSON out. */
-export async function callStructured<T>(system: string, user: string, schema: Record<string, unknown>, effort: Effort): Promise<T> {
+export async function callStructured<T>(system: string, user: UserContent, schema: Record<string, unknown>, effort: Effort): Promise<T> {
   let message;
   try {
     message = await finalMessage(system, user, schema, effort);
