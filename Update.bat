@@ -32,6 +32,9 @@ if errorlevel 1 (
 )
 echo.
 echo Rebuilding the app...
+rem OneDrive can mark the previous build's files read-only, which makes the rebuild fail
+rem with "EPERM: operation not permitted" -- clear that flag first.
+if exist ".next" attrib -R ".next\*" /S /D >nul 2>nul
 call npm run build
 if errorlevel 1 (
   echo.
