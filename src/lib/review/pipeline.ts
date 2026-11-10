@@ -413,7 +413,14 @@ export async function runReview(input: Buffer, options: ReviewOptions, progress:
         comments.add(f.anchor, `Photo date check: ${f.message}`);
         log.add("photoDates", { location: f.where, note: f.message, level: "attention" });
       }
-      if (dates.checked) {
+      if (dates.checked && !dates.dated) {
+        // e.g. ultrasonic / eddy current screen captures, which carry no camera date stamp.
+        log.add("photoDates", {
+          note: `None of the ${dates.checked} photos has a readable date stamp, so they couldn't be compared with the inspection date (${dates.inspectionDate}).${
+            dates.skippedReason ? ` ${dates.skippedReason}` : ""
+          }`,
+        });
+      } else if (dates.checked) {
         log.add("photoDates", {
           note: `Read the date on ${dates.dated} of ${dates.checked} photos and compared it with the inspection date (${dates.inspectionDate})${
             dates.findings.length ? "" : " -- all match"
