@@ -41,9 +41,26 @@ export function cleanPhotoCaptions(model: DocModel, log: ReviewLog) {
         }
       }
 
-      if ((name === "observation" || name === "classification") && !valueText) {
-        const target = descendants(values[values.length - 1], "w:p")[0];
-        if (target && applyRedline(target, "Typical").applied) typical++;
+      // Some MDI exports put a lone "-" in the Observation value; treat that as blank.
+      if ((name === "observation" || name === "classification") && !valueText.replace(/[-–—\s]/g, "")) {
+        const paras = values.flatMap((c) => descendants(c, "w:p"));
+        const target = paras.find((p) => readParagraph(p).text.trim()) ?? descendants(values[values.length - 1], "w:p")[0];
+        if (target && applyRedline(target, "Typical").applied) {
+          typical++;
+          for (const p of paras) {
+            if (p === target) continue;
+            const text = readParagraph(p).text;
+            if (text.trim()) applyRedline(p, "");
+          }
+        }
+      } else if (name === "observation" || name === "classification") {
+        for (const cell of values) {
+          for (const p of descendants(cell, "w:p")) {
+            const text = readParagraph(p).text;
+            const cleaned = text.replace(DASHES, "");
+            if (cleaned !== text && applyRedline(p, cleaned).applied) dashes++;
+          }
+        }
       }
 
       if (name === "comments" || name === "comment") {
@@ -90,7 +107,7 @@ export function cleanPhotoCaptions(model: DocModel, log: ReviewLog) {
   const notes: string[] = [];
   if (renamed) notes.push(`renamed ${renamed} "Classification" label${renamed === 1 ? "" : "s"} to "Observation"`);
   if (typical) notes.push(`filled ${typical} blank Observation${typical === 1 ? "" : "s"} with "Typical" (in red)`);
-  if (dashes) notes.push(`removed the dash from ${dashes} Comments entr${dashes === 1 ? "y" : "ies"}`);
+  if (dashes) notes.push(`removed the dash from ${dashes} Comments/Observation entr${dashes === 1 ? "y" : "ies"}`);
   if (planes) notes.push(`deleted ${planes} empty "Measurement Plane" row${planes === 1 ? "" : "s"}`);
   if (fileNames) notes.push(`removed ${fileNames} photo file name${fileNames === 1 ? "" : "s"} left under the photos`);
   if (notes.length) {
