@@ -4,7 +4,8 @@
  *    differently; ATS standardizes on Observation).
  *  - A blank Observation value -> "Typical" (red, so the reviewer sees it was filled in).
  *  - Dashes in the Comments value removed ("-" alone, or "- text" / "text -").
- *  - A "Measurement Plane" row with no value is deleted.
+ *  - A measurement row with no value ("Measurement Plane: --" -- the borescope writes "--" for
+ *    none -- or blank) is deleted. Rows with a value (Point-to-Line 0.073 in) stay.
  *  - Photo file names left under the photos ("Stage_1_Rotor_Blade_..._001.JPG") are removed.
  */
 import { childrenThroughWrappers, descendants, firstChild, textOf } from "../docx/ooxml";
@@ -13,6 +14,11 @@ import { applyRedline, readParagraph } from "./redline";
 import type { ReviewLog } from "./report";
 
 const FILE_NAME = /^\s*[\w\-(). ]{1,150}\.(jpe?g|png|bmp|tiff?|gif|heic)\s*$/i;
+// The caption rows every photo has; any other labeled row is a measurement row the borescope adds.
+const CORE_LABELS = new Set(["section", "component", "location", "observation", "classification", "comments", "comment", "serial number"]);
+// Measurement rows are named for what they measure ("Point-to-Line", "Measurement Plane", "Depth").
+const MEASUREMENT_LABEL = /measure|plane|point|line|depth|length|width|gap|distance|height|thickness|diameter|radius|angle|area/;
+const NO_VALUE = /^[\s\-–—.]*$/;
 const DASHES = /^\s*[-–—]+\s*|\s*[-–—]+\s*$/g;
 
 function label(cell: Element): string {
@@ -27,6 +33,8 @@ export function cleanPhotoCaptions(model: DocModel, log: ReviewLog) {
   let fileNames = 0;
 
   for (const table of model.photoTables) {
+    // Operational data / data plate tables hold readings, where "--" means "not recorded" -- keep them.
+    const readings = table.isOperationalData || table.isDataPlate;
     for (const row of descendants(table.topTbl, "w:tr")) {
       const cells = childrenThroughWrappers(row, "w:tc");
       if (cells.length < 2) continue;
@@ -73,7 +81,8 @@ export function cleanPhotoCaptions(model: DocModel, log: ReviewLog) {
         }
       }
 
-      if (name === "measurement plane" && !valueText) {
+      const isPhotoRow = descendants(row, "w:drawing").length > 0 || descendants(row, "w:pict").length > 0;
+      if (!readings && name && !CORE_LABELS.has(name) && MEASUREMENT_LABEL.test(name) && NO_VALUE.test(valueText) && !isPhotoRow) {
         const tbl = row.parentNode as Element | null;
         if (tbl && childrenThroughWrappers(tbl, "w:tr").length > 1) {
           tbl.removeChild(row);
@@ -108,7 +117,7 @@ export function cleanPhotoCaptions(model: DocModel, log: ReviewLog) {
   if (renamed) notes.push(`renamed ${renamed} "Classification" label${renamed === 1 ? "" : "s"} to "Observation"`);
   if (typical) notes.push(`filled ${typical} blank Observation${typical === 1 ? "" : "s"} with "Typical" (in red)`);
   if (dashes) notes.push(`removed the dash from ${dashes} Comments/Observation entr${dashes === 1 ? "y" : "ies"}`);
-  if (planes) notes.push(`deleted ${planes} empty "Measurement Plane" row${planes === 1 ? "" : "s"}`);
+  if (planes) notes.push(`deleted ${planes} empty measurement row${planes === 1 ? "" : "s"} (Measurement Plane etc.)`);
   if (fileNames) notes.push(`removed ${fileNames} photo file name${fileNames === 1 ? "" : "s"} left under the photos`);
   if (notes.length) {
     const text = notes.join("; ");
